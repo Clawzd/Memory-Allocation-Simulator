@@ -32,8 +32,21 @@ Non-functional targets (PDF 1.3):
 
 ## Install & Run
 
-Requires Python >= 3.11. Tkinter is part of the standard library on
-Windows and macOS; on some Linux distros install `python3-tk`:
+Requires Python >= 3.11. Tkinter is included with the standard Python
+installer on Windows and macOS.
+
+On Windows:
+
+```powershell
+cd OSPpy
+python -m memory_sim
+```
+
+If `python` is not recognized, install Python from
+<https://www.python.org/downloads/windows/> and enable **Add python.exe to PATH**
+during installation.
+
+On some Linux distros, install Tkinter first:
 
 ```bash
 sudo apt install python3-tk        # Debian / Ubuntu
