@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memory-sim"
+version = "1.0.0"
+description = "ICS 433 Phase 1 - Memory Allocation Simulator (Python / Tkinter)"
+requires-python = ">=3.11"
+authors = [
+    { name = "Ali Alsarhayd" },
+    { name = "Abdulkarim Althani" },
+    { name = "Mohammed Alrasasi" },
+    { name = "Hassan Alhassan" },
+]
+
+[project.scripts]
+memory-sim = "memory_sim.app:main"
+
+[tool.setuptools.packages.find]
+include = ["memory_sim*"]
