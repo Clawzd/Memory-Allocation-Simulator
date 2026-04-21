@@ -102,19 +102,7 @@ a real product, not a class demo:
 * **Status bar** - live `Ready / Running / LIVE` indicator plus current
   metrics and a hint for Ctrl+K.
 
-## Keyboard shortcuts
 
-| Key                 | Action                |
-| ------------------- | --------------------- |
-| Ctrl+K              | Command palette       |
-| Ctrl+R              | Run allocation        |
-| Ctrl+Z              | Undo                  |
-| Ctrl+Shift+Z / Ctrl+Y | Redo                |
-| Ctrl+E              | Export text report    |
-| Left                | Previous step         |
-| Right               | Next step             |
-| Space               | Play / Pause          |
-| R                   | Restart simulation    |
 
 ## File map
 
