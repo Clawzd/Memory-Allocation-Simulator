@@ -279,11 +279,14 @@ def generate_workload_steps(
             )
             continue
 
-        # Emit a scanning step for every inspected block up to, but not
-        # including, the chosen one. The chosen block gets a 'scanning-fit'
-        # highlight so the UI can pulse it.
+        # Emit a scanning step for every inspected block except the chosen one.
+        # Using scan_trace[:-1] only works for First/Next-Fit (where the chosen
+        # block is always last). For Best/Worst-Fit the chosen block can be
+        # anywhere, so we skip by ID instead.
         chosen_id = mm.blocks[chosen_idx].id
-        for bid in scan_trace[:-1]:
+        for bid in scan_trace:
+            if bid == chosen_id:
+                continue
             scanned = next((b for b in mm.blocks if b.id == bid), None)
             label = _block_label(scanned) if scanned is not None else "memory block"
             steps.append(
