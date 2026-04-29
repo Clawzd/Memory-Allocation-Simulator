@@ -136,6 +136,8 @@ def apply_theme(root, dark: bool = True) -> dict:
     # Containers
     style.configure("TFrame", background=bg)
     style.configure("Card.TFrame", background=card, borderwidth=0, relief="flat")
+    style.configure("Inset.TFrame", background=palette["card_alt"],
+                    borderwidth=0, relief="flat")
     style.configure("Header.TFrame", background=palette.get("header", card))
     style.configure("TLabelframe", background=card, foreground=fg, bordercolor=border)
     style.configure("TLabelframe.Label", background=card, foreground=muted)
@@ -217,13 +219,35 @@ def apply_theme(root, dark: bool = True) -> dict:
     style.map("TCombobox",
               fieldbackground=[("readonly", palette["card_alt"])],
               foreground=[("readonly", fg)])
+    # Improve combobox dropdown (popdown list) readability/theming.
+    root.option_add("*TCombobox*Listbox.background", palette["card_alt"])
+    root.option_add("*TCombobox*Listbox.foreground", fg)
+    root.option_add("*TCombobox*Listbox.selectBackground", primary)
+    root.option_add("*TCombobox*Listbox.selectForeground", primary_fg)
+    root.option_add("*Combobox*Listbox.background", palette["card_alt"])
+    root.option_add("*Combobox*Listbox.foreground", fg)
 
     # Checkbutton / Radiobutton
     style.configure("TCheckbutton", background=card, foreground=fg,
                     font=("Segoe UI", 11))
+    style.configure(
+        "StepToggle.TCheckbutton",
+        background=palette["card_alt"],
+        foreground=fg,
+        font=("Segoe UI Semibold", 11),
+        padding=(10, 8),
+        indicatorcolor=palette["card"],
+        indicatormargin=6,
+    )
     style.configure("TRadiobutton", background=card, foreground=fg,
                     font=("Segoe UI", 11))
     style.map("TCheckbutton", background=[("active", card)])
+    style.map(
+        "StepToggle.TCheckbutton",
+        background=[("active", palette["card_alt"]), ("selected", palette["card_alt"])],
+        foreground=[("disabled", muted)],
+        indicatorcolor=[("selected", primary), ("active", palette["card"])],
+    )
 
     # Scrollbar
     style.configure("Vertical.TScrollbar",

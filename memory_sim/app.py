@@ -458,13 +458,21 @@ class MemorySimulatorApp(tk.Tk):
         self._build_history_series()
 
         step_mode = self.control_panel.step_mode.get()
-        self._current_step = 0 if step_mode else len(self._steps) - 1
+        # Always begin from the first step; do not reveal final state upfront.
+        self._current_step = 0
         self._is_running = True
-        self._is_playing = False
+        # Step mode: manual progression. Non-step mode: autoplay.
+        self._is_playing = bool(not step_mode and len(self._steps) > 1)
         self._live_blocks = None
         self._cancel_autoplay()
         self._show_run_widgets(True)
-        self._refresh_view(animate=False)
+        if self._is_playing:
+            # Ensure auto mode visibly starts immediately after Run.
+            self._current_step = min(1, len(self._steps) - 1)
+            self._refresh_view(animate=False)
+            self._schedule_autoplay()
+        else:
+            self._refresh_view(animate=False)
         self.toasts.show(
             "Allocation ready",
             f"{pretty_name(algorithm)} \u00b7 {len(self._steps)} steps.",
@@ -783,17 +791,18 @@ class MemorySimulatorApp(tk.Tk):
         self.stats_panel.update_state(blocks, stats)
 
         if self._is_running:
-            self.step_log.set_steps(self._steps, self._current_step)
+            visible_steps = self._steps[: self._current_step + 1]
+            self.step_log.set_steps(visible_steps, len(visible_steps) - 1)
             self.step_controls.set_state(
                 self._current_step, len(self._steps), self._is_playing,
             )
-            # Sparkline showing full history, with current step indicator
+            # Reveal history progressively; do not show future points yet.
             if self._util_history:
                 self.frag_chart.update_history(
-                    self._util_history,
-                    self._frag_history,
-                    event_types=self._event_types,
-                    current=self._current_step,
+                    self._util_history[: self._current_step + 1],
+                    self._frag_history[: self._current_step + 1],
+                    event_types=self._event_types[: self._current_step + 1],
+                    current=len(self._util_history[: self._current_step + 1]) - 1,
                 )
             # status bar
             self.status.set_running(

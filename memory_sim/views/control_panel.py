@@ -46,17 +46,16 @@ class ControlPanel(ttk.Frame):
         self.total_memory = tk.IntVar(value=512)
         self.unit = tk.StringVar(value="KB")        # KB / MB - PDF FR-01
         self.algorithm = tk.StringVar(value="first-fit")
+        self.algorithm_label = tk.StringVar(value="")
         self.step_mode = tk.BooleanVar(value=True)  # PDF FR-09
+        self.step_mode_label = tk.StringVar(value="")
         self.new_name = tk.StringVar(value="")
         self.new_size = tk.StringVar(value="")
+        self._algo_labels = {key: pretty_name(key) for key in ALGORITHMS}
+        self._algo_keys_by_label = {label: key for key, label in self._algo_labels.items()}
 
-        # Default workload matches website (Home.jsx) ---------------------------
-        self.processes: list[dict] = [
-            {"op": "alloc", "name": "P1", "size": 100, "color_index": 0},
-            {"op": "alloc", "name": "P2", "size": 200, "color_index": 1},
-            {"op": "alloc", "name": "P3", "size":  80, "color_index": 2},
-            {"op": "alloc", "name": "P4", "size":  60, "color_index": 3},
-        ]
+        # Start empty so users can build workload manually or use presets.
+        self.processes: list[dict] = []
 
         self._build()
         self._refresh_process_list()
@@ -89,20 +88,43 @@ class ControlPanel(ttk.Frame):
 
         # --- algorithm ---------------------------------------------------
         ttk.Label(self, text="Algorithm", style="Muted.TLabel").pack(anchor="w")
-        algo_combo = ttk.Combobox(
-            self, textvariable=self.algorithm,
-            values=list(ALGORITHMS.keys()),
+        self._algo_combo = ttk.Combobox(
+            self,
+            textvariable=self.algorithm_label,
+            values=tuple(self._algo_labels.values()),
             state="readonly",
             font=("Segoe UI", 14),
+            postcommand=self._refresh_algorithm_choices,
         )
-        algo_combo.pack(fill="x", pady=(2, 10))
-        algo_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_change())
+        self._algo_combo.pack(fill="x", pady=(2, 10))
+        self._algo_combo.bind("<<ComboboxSelected>>", self._on_algorithm_selected)
+        self._sync_algorithm_display()
 
         # --- step-by-step toggle ----------------------------------------
-        ttk.Checkbutton(
-            self, text="Step-by-step mode",
+        toggle_row = ttk.Frame(self, style="Inset.TFrame", padding=(2, 2))
+        toggle_row.pack(fill="x", pady=(0, 10))
+        self._step_toggle = tk.Checkbutton(
+            toggle_row,
+            textvariable=self.step_mode_label,
             variable=self.step_mode,
-        ).pack(anchor="w", pady=(0, 10))
+            command=self._update_step_mode_toggle_ui,
+            indicatoron=False,
+            bd=0,
+            relief="flat",
+            highlightthickness=0,
+            anchor="w",
+            padx=10,
+            pady=8,
+            bg=self.palette["card_alt"],
+            fg=self.palette["foreground"],
+            activebackground=self.palette["card_alt"],
+            activeforeground=self.palette["foreground"],
+            selectcolor=self.palette["card_alt"],
+            font=("Segoe UI Semibold", 11),
+            cursor="hand2",
+        )
+        self._step_toggle.pack(fill="x")
+        self._update_step_mode_toggle_ui()
 
         tk.Frame(self, height=1, bg=self.palette["card_alt"], bd=0).pack(
             fill="x", pady=4
@@ -165,6 +187,10 @@ class ControlPanel(ttk.Frame):
             gen_row, text="Random workload", style="Secondary.TButton",
             command=self._load_random,
         ).grid(row=0, column=1, sticky="ew", padx=(6, 0), pady=2)
+        ttk.Button(
+            gen_row, text="Delete all", style="Secondary.TButton",
+            command=self._clear_processes,
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 2))
 
         tk.Frame(self, height=1, bg=self.palette["card_alt"], bd=0).pack(
             fill="x", pady=4
@@ -313,6 +339,7 @@ class ControlPanel(ttk.Frame):
         self.total_memory.set(512)
         self.unit.set("KB")
         self.algorithm.set("first-fit")
+        self._sync_algorithm_display()
         self.processes = [
             {"op": "alloc", "name": "P1", "size": 100, "color_index": 0},
             {"op": "alloc", "name": "P2", "size": 120, "color_index": 1},
@@ -325,6 +352,37 @@ class ControlPanel(ttk.Frame):
         ]
         self._refresh_process_list()
         self._on_change()
+
+    def _on_algorithm_selected(self, _event=None) -> None:
+        selected = self.algorithm_label.get()
+        key = self._algo_keys_by_label.get(selected)
+        if key is None:
+            return
+        self.algorithm.set(key)
+        self._on_change()
+
+    def _sync_algorithm_display(self) -> None:
+        self.algorithm_label.set(
+            self._algo_labels.get(self.algorithm.get(), self.algorithm.get())
+        )
+
+    def _refresh_algorithm_choices(self) -> None:
+        """Re-apply dropdown items before opening the popup list."""
+        self._algo_combo.configure(values=tuple(self._algo_labels.values()))
+
+    def _update_step_mode_toggle_ui(self) -> None:
+        if self.step_mode.get():
+            self.step_mode_label.set("● Step-by-step mode")
+            self._step_toggle.configure(
+                fg=self.palette["warning"],
+                activeforeground=self.palette["warning"],
+            )
+        else:
+            self.step_mode_label.set("○ Step-by-step mode")
+            self._step_toggle.configure(
+                fg=self.palette["muted"],
+                activeforeground=self.palette["muted"],
+            )
 
     def _load_random(self) -> None:
         """Generate a varied random workload with valid alloc/free events."""
@@ -418,10 +476,21 @@ class ControlPanel(ttk.Frame):
             fg=self.palette["foreground"],
             selectbackground=self.palette["primary"],
         )
+        alloc_colors = {
+            p.get("name", "").strip().lower(): color_for_process(
+                p.get("color_index", 0)
+            )
+            for p in self.processes
+            if p.get("op", "alloc") == "alloc"
+        }
         for i, p in enumerate(self.processes):
             if p.get("op", "alloc") == "free":
                 self.process_list.insert(tk.END, f"  FREE   {p['name']:<6}")
-                self.process_list.itemconfig(i, foreground=self.palette["warning"])
+                free_color = alloc_colors.get(
+                    p.get("name", "").strip().lower(),
+                    self.palette["warning"],
+                )
+                self.process_list.itemconfig(i, foreground=free_color)
             else:
                 self.process_list.insert(
                     tk.END,
