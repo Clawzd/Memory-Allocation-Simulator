@@ -87,6 +87,9 @@ class MemorySimulatorApp(tk.Tk):
         self._util_history: list[float] = []
         self._frag_history: list[float] = []
         self._event_types: list[str] = []
+        # Progressive chart/log during play; full series when scrubbing chart/log.
+        self._history_explore_mode: bool = False
+        self._chart_reveal_end: int = 0  # inclusive index of last plotted history point
 
         self._build_layout()
         self._bind_keys()
@@ -134,7 +137,7 @@ class MemorySimulatorApp(tk.Tk):
         self.memory_map.grid(row=0, column=0, sticky="nsew")
 
         self.frag_chart = FragmentationChart(
-            center, palette=self.palette, on_jump=self._on_jump,
+            center, palette=self.palette, on_jump=self._on_jump_from_ui,
         )
         self.frag_chart.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
 
@@ -150,7 +153,7 @@ class MemorySimulatorApp(tk.Tk):
         self.step_controls.grid_remove()
 
         self.step_log = StepLog(
-            center, palette=self.palette, on_jump=self._on_jump,
+            center, palette=self.palette, on_jump=self._on_jump_from_ui,
         )
         self.step_log.grid(row=3, column=0, sticky="nsew", pady=(10, 0))
         self.step_log.grid_remove()
@@ -466,9 +469,12 @@ class MemorySimulatorApp(tk.Tk):
         self._live_blocks = None
         self._cancel_autoplay()
         self._show_run_widgets(True)
+        self._history_explore_mode = False
         if self._is_playing:
             # Ensure auto mode visibly starts immediately after Run.
             self._current_step = min(1, len(self._steps) - 1)
+        self._chart_reveal_end = max(0, min(self._current_step, len(self._steps) - 1))
+        if self._is_playing:
             self._refresh_view(animate=False)
             self._schedule_autoplay()
         else:
@@ -488,6 +494,8 @@ class MemorySimulatorApp(tk.Tk):
         self._util_history = []
         self._frag_history = []
         self._event_types = []
+        self._history_explore_mode = False
+        self._chart_reveal_end = 0
         self._cancel_autoplay()
         self._show_run_widgets(False)
         self.frag_chart.reset()
@@ -543,14 +551,19 @@ class MemorySimulatorApp(tk.Tk):
         if not self._steps:
             return
         if self._current_step < len(self._steps) - 1:
+            self._history_explore_mode = False
             self._current_step += 1
             self._live_blocks = None
+            self._chart_reveal_end = max(
+                self._chart_reveal_end, self._current_step,
+            )
             self._refresh_view()
 
     def _on_prev(self) -> None:
         if not self._steps:
             return
         if self._current_step > 0:
+            self._history_explore_mode = False
             self._current_step -= 1
             self._live_blocks = None
             self._refresh_view()
@@ -561,13 +574,23 @@ class MemorySimulatorApp(tk.Tk):
         self._current_step = 0
         self._is_playing = False
         self._live_blocks = None
+        self._history_explore_mode = False
+        self._chart_reveal_end = 0
         self._cancel_autoplay()
         self._refresh_view()
+
+    def _on_jump_from_ui(self, step_index: int) -> None:
+        """Chart / step-log scrubbing: only while paused (not during autoplay)."""
+        if not self._steps or self._is_playing:
+            return
+        self._on_jump(step_index)
 
     def _on_jump(self, step_index: int) -> None:
         if not self._steps:
             return
-        self._current_step = max(0, min(len(self._steps) - 1, step_index))
+        self._history_explore_mode = True
+        last_built = max(0, min(self._chart_reveal_end, len(self._steps) - 1))
+        self._current_step = max(0, min(int(step_index), last_built))
         self._live_blocks = None
         self._cancel_autoplay()
         self._is_playing = False
@@ -578,9 +601,15 @@ class MemorySimulatorApp(tk.Tk):
             return
         if self._current_step >= len(self._steps) - 1:
             self._current_step = 0
+            self._history_explore_mode = False
+            self._chart_reveal_end = 0
+        self._history_explore_mode = False
         self._is_playing = not self._is_playing
         self._live_blocks = None
         if self._is_playing:
+            self._chart_reveal_end = max(
+                self._chart_reveal_end, self._current_step,
+            )
             self._schedule_autoplay()
         else:
             self._cancel_autoplay()
@@ -605,8 +634,12 @@ class MemorySimulatorApp(tk.Tk):
         if not self._is_playing:
             return
         if self._current_step < len(self._steps) - 1:
+            self._history_explore_mode = False
             self._current_step += 1
             self._live_blocks = None
+            self._chart_reveal_end = max(
+                self._chart_reveal_end, self._current_step,
+            )
             self._refresh_view()
             self._schedule_autoplay()
         else:
@@ -791,19 +824,35 @@ class MemorySimulatorApp(tk.Tk):
         self.stats_panel.update_state(blocks, stats)
 
         if self._is_running:
-            visible_steps = self._steps[: self._current_step + 1]
-            self.step_log.set_steps(visible_steps, len(visible_steps) - 1)
-            self.step_controls.set_state(
-                self._current_step, len(self._steps), self._is_playing,
-            )
-            # Reveal history progressively; do not show future points yet.
-            if self._util_history:
-                self.frag_chart.update_history(
-                    self._util_history[: self._current_step + 1],
-                    self._frag_history[: self._current_step + 1],
-                    event_types=self._event_types[: self._current_step + 1],
-                    current=len(self._util_history[: self._current_step + 1]) - 1,
+            n = len(self._steps)
+            if self._history_explore_mode:
+                # Only the timeline built so far (no future steps).
+                end = max(0, min(self._chart_reveal_end, len(self._util_history) - 1))
+                built = self._steps[: end + 1]
+                self.step_log.set_steps(
+                    built, min(self._current_step, len(built) - 1),
                 )
+                if self._util_history:
+                    self.frag_chart.update_history(
+                        self._util_history[: end + 1],
+                        self._frag_history[: end + 1],
+                        event_types=self._event_types[: end + 1],
+                        current=min(self._current_step, end),
+                    )
+            else:
+                end = max(0, min(self._chart_reveal_end, len(self._util_history) - 1))
+                visible = self._steps[: self._current_step + 1]
+                self.step_log.set_steps(visible, len(visible) - 1)
+                if self._util_history:
+                    self.frag_chart.update_history(
+                        self._util_history[: end + 1],
+                        self._frag_history[: end + 1],
+                        event_types=self._event_types[: end + 1],
+                        current=min(self._current_step, end),
+                    )
+            self.step_controls.set_state(
+                self._current_step, n, self._is_playing,
+            )
             # status bar
             self.status.set_running(
                 pretty_name(algorithm), self._current_step, len(self._steps),
