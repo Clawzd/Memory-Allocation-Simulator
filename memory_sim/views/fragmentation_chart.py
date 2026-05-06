@@ -313,7 +313,7 @@ class FragmentationChart(ttk.Frame):
 
     def _plot_geometry(self) -> tuple[int, int, int, int, int, int]:
         width = max(self.canvas.winfo_width(), 300)
-        height = int(self.canvas["height"])
+        height = max(self.canvas.winfo_height(), 60)
         plot_left = self.AXIS_W
         plot_right = max(plot_left + 40, width - self.RIGHT_W)
         plot_top = self.TOP_PAD
