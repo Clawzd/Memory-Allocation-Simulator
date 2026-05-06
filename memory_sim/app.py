@@ -62,7 +62,7 @@ class MemorySimulatorApp(tk.Tk):
         super().__init__()
         self.title("Memory Allocation Simulator")
         self.geometry("1760x980")
-        self.minsize(1480, 860)
+        self.minsize(1050, 680)
 
         self.dark_mode = tk.BooleanVar(value=True)
         self.palette = apply_theme(self, dark=True)
@@ -105,9 +105,9 @@ class MemorySimulatorApp(tk.Tk):
         outer = ttk.Frame(self, padding=(16, 6, 16, 10))
         outer.pack(fill="both", expand=True)
 
-        outer.columnconfigure(0, weight=0, minsize=520)
-        outer.columnconfigure(1, weight=1)
-        outer.columnconfigure(2, weight=0, minsize=500)
+        outer.columnconfigure(0, weight=2, minsize=320)
+        outer.columnconfigure(1, weight=5)
+        outer.columnconfigure(2, weight=2, minsize=300)
         outer.rowconfigure(0, weight=1)
 
         # Left column -------------------------------------------------------
